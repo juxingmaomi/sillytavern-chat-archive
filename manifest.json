@@ -1,0 +1,11 @@
+{
+  "display_name": "角色聊天档案",
+  "loading_order": 50,
+  "js": "ui/index.js",
+  "css": "ui/style.css",
+  "author": "Codex",
+  "version": "0.2.0",
+  "homePage": "https://github.com/juxingmaomi/sillytavern-chat-archive",
+  "auto_update": true,
+  "minimum_client_version": "1.16.0"
+}
