@@ -248,10 +248,20 @@
   }
 
   async function fetchPinnedChats() {
-    const pinned = Object.values(getPinnedState()).slice(0, MAX_PINNED);
+    const pinnedState = getPinnedState();
+    const pinned = Object.values(pinnedState);
     if (!pinned.length) return [];
     const data = await requestApi('pinned', { pinned });
-    return Array.isArray(data.chats) ? data.chats : [];
+    const chats = Array.isArray(data.chats) ? data.chats.slice(0, MAX_PINNED) : [];
+    const cleanedState = Object.fromEntries(chats.map(chat => [getPinnedKey(chat), {
+      group: chat.group || '',
+      avatar: chat.avatar || '',
+      file_name: chat.file_name.endsWith('.jsonl') ? chat.file_name : `${chat.file_name}.jsonl`,
+    }]));
+    if (JSON.stringify(cleanedState) !== JSON.stringify(pinnedState)) {
+      state.context.accountStorage.setItem(PINNED_STORAGE_KEY, JSON.stringify(cleanedState));
+    }
+    return chats;
   }
 
   async function fetchRecentOpenedChat() {

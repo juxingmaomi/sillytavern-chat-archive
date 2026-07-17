@@ -189,7 +189,7 @@ async function getCharacterChats(chatsRoot, avatarValue) {
 }
 
 async function getPinnedChats(directories, pinnedItems) {
-  const items = Array.isArray(pinnedItems) ? pinnedItems.slice(0, 3) : [];
+  const items = Array.isArray(pinnedItems) ? pinnedItems.slice(0, 100) : [];
   const results = [];
   for (const item of items) {
     try {
@@ -261,7 +261,7 @@ function getUserDirectories(request) {
 
 async function init(router) {
   router.get('/health', (_request, response) => {
-    response.json({ ok: true, version: '0.2.1' });
+    response.json({ ok: true, version: '0.2.2' });
   });
 
   router.post('/catalog', async (request, response) => {
