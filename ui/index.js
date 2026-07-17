@@ -11,7 +11,6 @@
     showPinned: true,
     showRecent: true,
     showArchive: true,
-    maxPinned: 3,
     characterSort: 'recent',
     chatSort: 'recent',
     deleteEnabled: true,
@@ -39,11 +38,7 @@
     const raw = state.context?.accountStorage?.getItem(SETTINGS_STORAGE_KEY);
     try {
       const parsed = raw ? JSON.parse(raw) : {};
-      return {
-        ...DEFAULT_SETTINGS,
-        ...(parsed && typeof parsed === 'object' ? parsed : {}),
-        maxPinned: Math.min(10, Math.max(1, Number(parsed?.maxPinned) || DEFAULT_SETTINGS.maxPinned)),
-      };
+      return { ...DEFAULT_SETTINGS, ...(parsed && typeof parsed === 'object' ? parsed : {}) };
     } catch {
       return { ...DEFAULT_SETTINGS };
     }
@@ -52,10 +47,6 @@
   function updateSettings(patch) {
     const settings = { ...getSettings(), ...patch };
     state.context.accountStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-    if (Object.hasOwn(patch, 'maxPinned')) {
-      const pinnedEntries = Object.entries(getPinnedState()).slice(0, settings.maxPinned);
-      state.context.accountStorage.setItem(PINNED_STORAGE_KEY, JSON.stringify(Object.fromEntries(pinnedEntries)));
-    }
     state.catalog = null;
     restoreNativeWelcome();
     if (isEnabled()) scanWelcomePanels();
@@ -106,11 +97,6 @@
   function setPinned(item, pinned) {
     const pinnedState = getPinnedState();
     const key = getPinnedKey(item);
-    const maxPinned = getSettings().maxPinned;
-    if (pinned && !Object.hasOwn(pinnedState, key) && Object.keys(pinnedState).length >= maxPinned) {
-      toastr.warning(`最多置顶 ${maxPinned} 个聊天，请先取消一个置顶。`);
-      return false;
-    }
     if (pinned) {
       pinnedState[key] = {
         group: item.group || '',
@@ -294,7 +280,7 @@
     const pinned = Object.values(pinnedState);
     if (!pinned.length) return [];
     const data = await requestApi('pinned', { pinned });
-    const chats = Array.isArray(data.chats) ? data.chats.slice(0, getSettings().maxPinned) : [];
+    const chats = Array.isArray(data.chats) ? data.chats : [];
     const cleanedState = Object.fromEntries(chats.map(chat => [getPinnedKey(chat), {
       group: chat.group || '',
       avatar: chat.avatar || '',
@@ -443,7 +429,7 @@
     pinnedSection.className = 'stca-section';
     const pinnedTitle = document.createElement('div');
     pinnedTitle.className = 'stca-section-title';
-    pinnedTitle.innerHTML = `<span><i class="fa-solid fa-thumbtack"></i> 置顶聊天</span><small>最多 ${settings.maxPinned} 个</small>`;
+    pinnedTitle.innerHTML = '<span><i class="fa-solid fa-thumbtack"></i> 置顶聊天</span>';
     const pinnedList = document.createElement('div');
     pinnedList.className = 'stca-pinned-list';
     pinnedSection.append(pinnedTitle, pinnedList);
@@ -812,7 +798,6 @@
     addCheckbox('显示置顶聊天', settings.showPinned, value => updateSettings({ showPinned: value }));
     addCheckbox('显示最近打开', settings.showRecent, value => updateSettings({ showRecent: value }));
     addCheckbox('显示角色归档', settings.showArchive, value => updateSettings({ showArchive: value }));
-    addSelect('最大置顶数量', settings.maxPinned, Array.from({ length: 10 }, (_, index) => [String(index + 1), String(index + 1)]), value => updateSettings({ maxPinned: Number(value) }));
     divider();
     addSelect('角色排序', settings.characterSort, [
       ['recent', '最近聊天'],
