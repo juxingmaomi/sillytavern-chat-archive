@@ -44,66 +44,179 @@ SillyTavern 原生聊天接口通常会读取完整聊天文件。对于几十 M
 - 需要安装 Git。
 - 需要启用 SillyTavern 服务器插件。
 
-## 安装
+## 安装前准备
 
-仓库地址：
+项目地址：
 
 ```text
 https://github.com/juxingmaomi/sillytavern-chat-archive
 ```
 
-### 第一步：安装前端扩展
+安装前请确认：
 
-1. 启动 SillyTavern。
-2. 打开顶部的“扩展程序”面板。
-3. 点击“安装扩展程序”。
-4. 输入仓库地址：
+1. 使用的是通过 Git、压缩包或官方启动器部署的常规 SillyTavern，而不是无法安装服务器插件的纯网页托管版本。
+2. 电脑已经安装 Git。在终端运行 `git --version` 应能看到版本号。
+3. 电脑已经安装 Node.js。在终端运行 `node --version` 应能看到版本号。
+4. 知道 SillyTavern 根目录的位置。
+
+SillyTavern 根目录通常同时包含以下文件或文件夹：
+
+```text
+SillyTavern/
+├─ Start.bat
+├─ config.yaml
+├─ plugins.js
+├─ package.json
+├─ plugins/
+└─ public/
+```
+
+前端扩展和服务器插件必须分别安装。只安装其中一个，插件无法完整工作。
+
+## 安装前端扩展
+
+前端必须通过 SillyTavern 自带的“安装扩展程序”功能安装，不要下载 ZIP，也不要手动复制文件夹。
+
+1. 正常启动 SillyTavern，并在浏览器打开酒馆页面。
+2. 点击页面顶部的“扩展程序”图标。
+3. 在扩展程序面板右上角点击“安装扩展程序”。
+4. 在弹出的输入框中粘贴：
 
    ```text
    https://github.com/juxingmaomi/sillytavern-chat-archive
    ```
 
-5. 确认安装，等待酒馆提示安装完成。
+5. 点击“安装”或“确定”。
+6. 等待酒馆提示扩展安装成功。安装过程中不要刷新或关闭页面。
+7. 点击“管理扩展程序”，确认列表中出现：
 
-不要下载压缩包，也不要手动把文件复制到扩展目录。
+   ```text
+   酒馆首页文件分类
+   ```
+
+8. 如果列表中已经出现该名称，前端就安装完成了。此时首页可能仍提示服务器插件未启用，这是正常的，还需要继续安装后端。
+
+### 前端安装失败
+
+- 提示 Git 不可用：安装 Git，关闭并重新启动 SillyTavern后再试。
+- 提示目录已存在：打开“管理扩展程序”，确认是否已经安装；不要重复安装。
+- 提示无法连接 GitHub：检查网络或代理，然后重新点击安装。
+- 安装成功但列表里没有：先按 `Ctrl + F5`，仍无效时重启 SillyTavern。
+
+## 安装服务器插件
+
+服务器插件使用 SillyTavern 官方提供的 `plugins.js` 命令安装，不要手动复制仓库到 `plugins` 文件夹。
+
+### 第一步：完全关闭 SillyTavern
+
+关闭启动 SillyTavern 的终端窗口，并确认酒馆服务已经停止。修改服务器插件配置前不要让旧进程继续运行。
 
 ### 第二步：启用服务器插件
 
-关闭 SillyTavern，然后打开 SillyTavern 根目录中的 `config.yaml`，确认包含：
+1. 进入 SillyTavern 根目录。
+2. 使用记事本、VS Code 或其他纯文本编辑器打开 `config.yaml`。
+3. 搜索 `enableServerPlugins`。
+4. 如果看到：
 
-```yaml
-enableServerPlugins: true
+   ```yaml
+   enableServerPlugins: false
+   ```
+
+   将 `false` 改成 `true`。
+
+5. 最终应为：
+
+   ```yaml
+   enableServerPlugins: true
+   ```
+
+6. 不要重复添加多个 `enableServerPlugins`，修改已有配置即可。
+7. 建议同时启用服务器插件自动更新：
+
+   ```yaml
+   enableServerPluginsAutoUpdate: true
+   ```
+
+8. 保存 `config.yaml`。
+
+服务器插件不受浏览器沙箱保护，能够访问服务器文件系统。只应安装可信来源的服务器插件。
+
+### 第三步：在酒馆根目录打开终端
+
+Windows 可以使用以下任意一种方法：
+
+1. 在文件资源管理器打开 SillyTavern 根目录。
+2. 确认当前目录能看到 `Start.bat`、`config.yaml` 和 `plugins.js`。
+3. 在文件夹空白处按住 `Shift` 并点击鼠标右键，选择“在此处打开 PowerShell 窗口”或“在终端中打开”。
+
+也可以点击文件资源管理器顶部的地址栏，输入：
+
+```text
+powershell
 ```
 
-可选：允许服务器插件在启动时自动更新：
+然后按回车。新打开的 PowerShell 会自动位于当前文件夹。
 
-```yaml
-enableServerPluginsAutoUpdate: true
+Linux 或 macOS 用户在终端使用 `cd` 进入 SillyTavern 根目录即可。
+
+### 第四步：确认终端位置正确
+
+在终端运行：
+
+```bash
+node plugins.js
 ```
 
-服务器插件不受浏览器沙箱保护，只应安装可信来源的插件。
+如果出现 `Usage: node plugins.js <command>`，说明位置正确。
 
-### 第三步：使用官方命令安装服务器插件
+如果提示找不到 `plugins.js`，说明终端没有位于 SillyTavern 根目录，需要先切换到正确目录。
 
-在 SillyTavern 根目录打开终端，运行：
+### 第五步：运行官方安装命令
+
+在同一个终端运行：
 
 ```bash
 node plugins.js install https://github.com/juxingmaomi/sillytavern-chat-archive.git
 ```
 
-这是 SillyTavern 自带的服务器插件安装命令。不要手动复制项目到 `plugins` 文件夹。
+等待命令执行完成。成功时会出现类似：
 
-### 第四步：重启并刷新
+```text
+Plugin https://github.com/juxingmaomi/sillytavern-chat-archive.git installed to plugins/sillytavern-chat-archive
+```
 
-1. 重新启动 SillyTavern。
-2. 终端出现以下内容，表示后端加载成功：
+目录名称由 SillyTavern 官方安装程序自动决定，不需要手动改名。
+
+### 第六步：重新启动并验证后端
+
+1. 使用原来的 `Start.bat` 或你的正常启动方式重新启动 SillyTavern。
+2. 不要关闭启动终端，观察启动日志。
+3. 看到以下内容表示服务器插件加载成功：
 
    ```text
    [Chat Archive] Server plugin loaded.
    ```
 
-3. 在浏览器按 `Ctrl + F5` 强制刷新。
-4. 返回酒馆首页，即可看到置顶聊天、最近聊天和角色归档。
+4. 如果看到 `Server plugins are disabled`，重新检查 `config.yaml` 中的 `enableServerPlugins: true`。
+5. 如果没有看到加载成功提示，检查安装命令是否报错，并确认启动的是刚才安装插件的那一份 SillyTavern。
+
+### 第七步：刷新前端
+
+1. 回到浏览器中的 SillyTavern 页面。
+2. 按 `Ctrl + F5` 强制刷新，手机可以关闭页面后重新打开。
+3. 返回酒馆首页。
+4. 正常情况下会出现“置顶聊天”“最近聊天”和“角色归档”。
+5. 打开“扩展程序”，展开“酒馆首页文件分类”，可以调整首页模块、排序和删除保护。
+
+## 完整安装检查
+
+安装完成后，应同时满足以下条件：
+
+- “管理扩展程序”中可以看到“酒馆首页文件分类”。
+- SillyTavern 启动终端中出现 `[Chat Archive] Server plugin loaded.`。
+- 酒馆首页出现置顶聊天、最近聊天和角色归档。
+- 点击角色可以打开聊天文件列表。
+- 点击“预览”可以看到最后两条消息，并且不会切换当前聊天。
 
 ## 更新
 
