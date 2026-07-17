@@ -293,10 +293,17 @@
   }
 
   async function fetchRecentOpenedChat() {
-    const recent = getRecentOpened();
-    if (!recent) return null;
+    let recent = getRecentOpened();
+    if (!recent) {
+      const catalogData = await requestApi('catalog', {});
+      const latest = Array.isArray(catalogData.characters) ? catalogData.characters[0] : null;
+      if (!latest?.avatar || !latest?.latest_file) return null;
+      recent = { avatar: latest.avatar, file_name: `${latest.latest_file}.jsonl` };
+    }
     const data = await requestApi('pinned', { pinned: [recent] });
-    return Array.isArray(data.chats) && data.chats.length ? data.chats[0] : null;
+    const chat = Array.isArray(data.chats) && data.chats.length ? data.chats[0] : null;
+    if (chat && !getRecentOpened()) setRecentOpened(recent);
+    return chat;
   }
 
   function createPinnedRow(chat) {
