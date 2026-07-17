@@ -347,8 +347,7 @@
     });
     unpinButton.classList.add('active');
     const previewButton = createTextButton('预览', '预览最后两条消息', () => showQuickPreview(chat));
-    const openButton = createIconButton('fa-arrow-right', '打开聊天', () => openChat(chat));
-    actions.append(unpinButton, previewButton, openButton);
+    actions.append(unpinButton, previewButton);
     row.append(image, content, actions);
     row.addEventListener('click', () => void openChat(chat));
     row.addEventListener('keydown', event => {
