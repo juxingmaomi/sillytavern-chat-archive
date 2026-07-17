@@ -261,7 +261,7 @@ function getUserDirectories(request) {
 
 async function init(router) {
   router.get('/health', (_request, response) => {
-    response.json({ ok: true, version: '0.4.4' });
+    response.json({ ok: true, version: '0.5.0' });
   });
 
   router.post('/catalog', async (request, response) => {
@@ -299,10 +299,17 @@ async function init(router) {
   router.post('/preview', async (request, response) => {
     try {
       const directories = getUserDirectories(request);
-      const avatar = normalizeAvatar(request.body?.avatar);
       const fileName = normalizeChatFile(request.body?.file_name);
-      const characterDirectory = avatar.slice(0, -PNG_EXTENSION.length);
-      const filePath = resolveUnder(directories.chats, characterDirectory, fileName);
+      let filePath;
+      if (request.body?.avatar) {
+        const avatar = normalizeAvatar(request.body.avatar);
+        const characterDirectory = avatar.slice(0, -PNG_EXTENSION.length);
+        filePath = resolveUnder(directories.chats, characterDirectory, fileName);
+      } else if (request.body?.group && directories.groupChats) {
+        filePath = resolveUnder(directories.groupChats, fileName);
+      } else {
+        throw new Error('Chat preview requires a character or group.');
+      }
       const messages = await readLastMessages(filePath, 2);
       response.json({ messages });
     } catch (error) {

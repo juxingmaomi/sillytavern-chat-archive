@@ -334,6 +334,23 @@
   width: min(180px, 48%);
 }
 
+.stca-text-button {
+  min-width: 52px;
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+
+.stca-quick-preview-modal {
+  width: min(680px, 94vw);
+  height: auto;
+  max-height: min(720px, 88dvh);
+}
+
+.stca-quick-preview-pane {
+  min-height: 180px;
+  padding: 16px;
+}
+
 .stca-settings-divider {
   margin: 10px 0;
   border: 0;

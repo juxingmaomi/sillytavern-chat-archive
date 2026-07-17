@@ -187,6 +187,20 @@
     return button;
   }
 
+  function createTextButton(text, title, action) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'menu_button stca-text-button';
+    button.textContent = text;
+    button.title = title;
+    button.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      void action(button);
+    });
+    return button;
+  }
+
   function getCharacter(avatar) {
     return state.context.characters.find(character => character.avatar === avatar) ?? null;
   }
@@ -332,8 +346,9 @@
       if (setPinned(chat, false)) await refreshHomeSections();
     });
     unpinButton.classList.add('active');
+    const previewButton = createTextButton('预览', '预览最后两条消息', () => showQuickPreview(chat));
     const openButton = createIconButton('fa-arrow-right', '打开聊天', () => openChat(chat));
-    actions.append(unpinButton, openButton);
+    actions.append(unpinButton, previewButton, openButton);
     row.append(image, content, actions);
     row.addEventListener('click', () => void openChat(chat));
     row.addEventListener('keydown', event => {
@@ -349,6 +364,59 @@
     const unpinButton = row.querySelector('.stca-icon-button');
     if (unpinButton) unpinButton.remove();
     return row;
+  }
+
+  async function showQuickPreview(item) {
+    closeModal();
+    const overlay = document.createElement('div');
+    overlay.className = 'stca-overlay';
+    const modal = document.createElement('div');
+    modal.className = 'stca-modal stca-quick-preview-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    const header = document.createElement('div');
+    header.className = 'stca-modal-header';
+    const title = document.createElement('div');
+    title.className = 'stca-modal-title';
+    title.textContent = `${getDisplayName(item)} - ${item.file_name.replace(/\.jsonl$/i, '')}`;
+    const close = createIconButton('fa-xmark', '关闭', closeModal);
+    header.append(title, close);
+    const pane = document.createElement('div');
+    pane.className = 'stca-preview-pane stca-quick-preview-pane';
+    pane.append(createEmpty('正在读取最后两条消息...'));
+    modal.append(header, pane);
+    overlay.append(modal);
+    overlay.addEventListener('click', event => {
+      if (event.target === overlay) closeModal();
+    });
+    document.body.append(overlay);
+    state.modal = overlay;
+
+    try {
+      const data = await requestApi('preview', {
+        avatar: item.avatar || '',
+        group: item.group || '',
+        file_name: item.file_name,
+      });
+      const messages = document.createElement('div');
+      messages.className = 'stca-preview-messages';
+      for (const message of data.messages || []) {
+        const row = document.createElement('div');
+        row.className = `stca-message-row ${message.is_user ? 'is-user' : 'is-character'}`;
+        const name = document.createElement('div');
+        name.className = 'stca-message-name';
+        name.textContent = message.name || (message.is_user ? '用户' : getDisplayName(item));
+        const bubble = document.createElement('div');
+        bubble.className = 'stca-message-bubble';
+        bubble.textContent = message.text;
+        row.append(name, bubble);
+        messages.append(row);
+      }
+      if (!messages.childElementCount) messages.append(createEmpty('没有找到可预览的对话消息'));
+      pane.replaceChildren(messages);
+    } catch (error) {
+      pane.replaceChildren(createEmpty(`预览失败：${error.message}`));
+    }
   }
 
   function createCharacterRow(entry) {
