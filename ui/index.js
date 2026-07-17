@@ -5,6 +5,7 @@
   const API_ROOT = '/api/plugins/chat-archive';
   const PINNED_STORAGE_KEY = 'pinnedChats';
   const RECENT_OPENED_STORAGE_KEY = 'chatArchiveLastOpened';
+  const RECENT_LOGIC_VERSION_KEY = 'chatArchiveRecentLogicVersion';
   const ENABLED_STORAGE_KEY = 'chatArchiveEnabled';
   const SETTINGS_STORAGE_KEY = 'chatArchiveSettings';
   const DEFAULT_SETTINGS = Object.freeze({
@@ -257,7 +258,6 @@
       }
 
       state.context = getContext();
-      setRecentOpened(item);
       closeModal();
     } catch (error) {
       console.error(`[${MODULE_NAME}] Failed to open chat safely`, error);
@@ -402,7 +402,7 @@
     const characterList = panel.querySelector('.stca-character-list');
     if (!pinnedList && !recentList && !characterList) return;
     pinnedList?.replaceChildren(createEmpty('正在读取置顶聊天...'));
-    recentList?.replaceChildren(createEmpty('正在读取最近打开...'));
+    recentList?.replaceChildren(createEmpty('正在读取最近聊天...'));
     characterList?.replaceChildren(createEmpty('正在整理角色聊天...'));
     try {
       const [pinnedChats, recentChat, catalogData] = await Promise.all([
@@ -412,7 +412,7 @@
       ]);
       if (characterList) state.catalog = catalogData.characters || [];
       pinnedList?.replaceChildren(...(pinnedChats.length ? pinnedChats.map(createPinnedRow) : [createEmpty('还没有置顶聊天')]));
-      recentList?.replaceChildren(...(recentChat ? [createRecentRow(recentChat)] : [createEmpty('还没有最近打开的聊天')]));
+      recentList?.replaceChildren(...(recentChat ? [createRecentRow(recentChat)] : [createEmpty('还没有最近聊天')]));
       characterList?.replaceChildren(...(state.catalog.length ? sortCharacters(state.catalog).map(createCharacterRow) : [createEmpty('没有找到角色聊天文件')]));
     } catch (error) {
       console.error(`[${MODULE_NAME}] Failed to load archive home`, error);
@@ -452,7 +452,7 @@
     recentSection.className = 'stca-section';
     const recentTitle = document.createElement('div');
     recentTitle.className = 'stca-section-title';
-    recentTitle.innerHTML = '<span><i class="fa-solid fa-clock-rotate-left"></i> 最近打开</span>';
+    recentTitle.innerHTML = '<span><i class="fa-solid fa-clock-rotate-left"></i> 最近聊天</span>';
     const recentList = document.createElement('div');
     recentList.className = 'stca-recent-list';
     recentSection.append(recentTitle, recentList);
@@ -796,7 +796,7 @@
     };
     divider();
     addCheckbox('显示置顶聊天', settings.showPinned, value => updateSettings({ showPinned: value }));
-    addCheckbox('显示最近打开', settings.showRecent, value => updateSettings({ showRecent: value }));
+    addCheckbox('显示最近聊天', settings.showRecent, value => updateSettings({ showRecent: value }));
     addCheckbox('显示角色归档', settings.showArchive, value => updateSettings({ showArchive: value }));
     divider();
     addSelect('角色排序', settings.characterSort, [
@@ -828,14 +828,19 @@
       setTimeout(initialize, 250);
       return;
     }
+    if (state.context.accountStorage.getItem(RECENT_LOGIC_VERSION_KEY) !== 'message-v1') {
+      state.context.accountStorage.removeItem(RECENT_OPENED_STORAGE_KEY);
+      state.context.accountStorage.setItem(RECENT_LOGIC_VERSION_KEY, 'message-v1');
+    }
     buildSettingsPanel();
     scanWelcomePanels();
     state.observer = new MutationObserver(scanWelcomePanels);
     state.observer.observe(document.body, { childList: true, subtree: true });
-    const rememberChangedChat = chatId => {
+    const rememberActiveChat = (_messageId, messageType) => {
       if (!isEnabled()) return;
+      if (messageType === 'first_message') return;
       const context = getContext();
-      const currentId = String(chatId || context?.chatId || '').replace(/\.jsonl$/i, '');
+      const currentId = String(context?.chatId || '').replace(/\.jsonl$/i, '');
       if (!context || !currentId) return;
       const character = context.characters[context.characterId];
       const item = context.groupId
@@ -845,9 +850,10 @@
           : null;
       if (!item) return;
       setRecentOpened(item);
+      void refreshHomeSections();
     };
-    state.context.eventSource?.on?.(state.context.eventTypes.CHAT_CHANGED, rememberChangedChat);
-    rememberChangedChat(state.context.chatId);
+    state.context.eventSource?.on?.(state.context.eventTypes.MESSAGE_SENT, rememberActiveChat);
+    state.context.eventSource?.on?.(state.context.eventTypes.MESSAGE_RECEIVED, rememberActiveChat);
     console.log(`[${MODULE_NAME}] UI extension loaded.`);
   }
 
