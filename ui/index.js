@@ -73,6 +73,33 @@
     return data;
   }
 
+  async function refreshExternalChatCaches() {
+    const context = getContext();
+    if (!context) return;
+    const tasks = [
+      fetch('/api/plugins/cocktail-plus/invalidate', {
+        method: 'POST',
+        headers: context.getRequestHeaders(),
+        body: JSON.stringify({ endpoints: ['characters-all'], reason: 'chat-archive-delete' }),
+        cache: 'no-store',
+      }),
+    ];
+    if (globalThis.BaiBaoKu) {
+      tasks.push(fetch('/api/plugins/baibaoku/v1/characters/fast-all', {
+        method: 'POST',
+        headers: context.getRequestHeaders(),
+        body: '{}',
+        cache: 'no-store',
+      }));
+    }
+    const results = await Promise.allSettled(tasks);
+    results.forEach(result => {
+      if (result.status === 'rejected') {
+        console.debug(`[${MODULE_NAME}] Optional cache refresh was unavailable`, result.reason);
+      }
+    });
+  }
+
   function getPinnedState() {
     const raw = state.context?.accountStorage?.getItem(PINNED_STORAGE_KEY);
     if (!raw) return {};
@@ -698,6 +725,7 @@
       deleteButton.disabled = true;
       try {
         const result = await requestApi('delete', { avatar, file_name: chat.file_name });
+        await refreshExternalChatCaches();
         removeChatReferences(pinItem);
         row.remove();
         previewPane.replaceChildren(createEmpty('聊天文件已删除'));
