@@ -305,6 +305,14 @@
   gap: 14px;
 }
 
+.stca-opening-chat .stca-icon-button,
+.stca-opening-chat .stca-pinned-row,
+.stca-opening-chat .stca-recent-row,
+.stca-opening-chat .stca-chat-row {
+  pointer-events: none;
+  opacity: 0.65;
+}
+
 .stca-message-row {
   display: flex;
   flex-direction: column;

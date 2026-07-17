@@ -6,16 +6,23 @@
   const PINNED_STORAGE_KEY = 'pinnedChats';
   const RECENT_OPENED_STORAGE_KEY = 'chatArchiveLastOpened';
   const MAX_PINNED = 3;
+  let scriptModulePromise = null;
   const state = {
     context: null,
     catalog: null,
     observer: null,
     modal: null,
     selectedAvatar: '',
+    openingChat: false,
   };
 
   function getContext() {
     return globalThis.SillyTavern?.getContext?.() ?? null;
+  }
+
+  function getScriptModule() {
+    scriptModulePromise ??= import('/script.js');
+    return scriptModulePromise;
   }
 
   async function requestApi(route, body = null) {
@@ -175,20 +182,61 @@
   }
 
   async function openChat(item) {
-    setRecentOpened(item);
-    closeModal();
-    if (item.avatar) {
-      const characterId = state.context.characters.findIndex(character => character.avatar === item.avatar);
-      if (characterId < 0) {
-        toastr.error('没有找到这个角色卡。');
-        return;
-      }
-      await state.context.selectCharacterById(characterId);
-      await state.context.openCharacterChat(item.file_name.replace(/\.jsonl$/i, ''));
+    if (state.openingChat) {
+      toastr.info('正在打开聊天，请稍候。');
       return;
     }
-    if (item.group) {
-      await state.context.openGroupChat(item.group, item.file_name.replace(/\.jsonl$/i, ''));
+
+    state.openingChat = true;
+    document.documentElement.classList.add('stca-opening-chat');
+    const fileName = item.file_name.replace(/\.jsonl$/i, '');
+
+    try {
+      if (item.avatar) {
+        const initialContext = getContext();
+        const characterId = initialContext?.characters?.findIndex(character => character.avatar === item.avatar) ?? -1;
+        if (characterId < 0) throw new Error('没有找到这个角色卡。');
+
+        const { getCurrentChatId, saveSettingsDebounced, setActiveCharacter } = await getScriptModule();
+        await initialContext.selectCharacterById(characterId);
+
+        const selectedContext = getContext();
+        const selectedCharacter = selectedContext?.characters?.[selectedContext.characterId];
+        if (String(selectedContext?.characterId) !== String(characterId) || selectedCharacter?.avatar !== item.avatar) {
+          throw new Error('酒馆仍在保存聊天，未能切换到目标角色。请稍后重试。');
+        }
+
+        setActiveCharacter(item.avatar);
+        saveSettingsDebounced();
+        if (getCurrentChatId() !== fileName) {
+          await selectedContext.openCharacterChat(fileName);
+        }
+
+        const openedContext = getContext();
+        const openedCharacter = openedContext?.characters?.[openedContext.characterId];
+        if (openedCharacter?.avatar !== item.avatar || getCurrentChatId() !== fileName) {
+          throw new Error('聊天未能正确打开，已为你中止操作。');
+        }
+      } else if (item.group) {
+        const context = getContext();
+        await context.openGroupChat(item.group, fileName);
+        const { getCurrentChatId } = await getScriptModule();
+        if (getCurrentChatId() !== fileName) {
+          throw new Error('群聊未能正确打开，已为你中止操作。');
+        }
+      } else {
+        throw new Error('聊天缺少角色或群组信息。');
+      }
+
+      state.context = getContext();
+      setRecentOpened(item);
+      closeModal();
+    } catch (error) {
+      console.error(`[${MODULE_NAME}] Failed to open chat safely`, error);
+      toastr.error(error.message || '打开聊天失败。');
+    } finally {
+      state.openingChat = false;
+      document.documentElement.classList.remove('stca-opening-chat');
     }
   }
 
