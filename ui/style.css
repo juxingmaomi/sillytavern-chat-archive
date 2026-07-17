@@ -313,6 +313,23 @@
   opacity: 0.65;
 }
 
+#stca-settings .inline-drawer-content {
+  padding: 8px 0;
+}
+
+.stca-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.stca-setting-row input[type='checkbox'] {
+  flex: 0 0 auto;
+}
+
 .stca-message-row {
   display: flex;
   flex-direction: column;

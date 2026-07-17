@@ -5,6 +5,7 @@
   const API_ROOT = '/api/plugins/chat-archive';
   const PINNED_STORAGE_KEY = 'pinnedChats';
   const RECENT_OPENED_STORAGE_KEY = 'chatArchiveLastOpened';
+  const ENABLED_STORAGE_KEY = 'chatArchiveEnabled';
   const MAX_PINNED = 3;
   let scriptModulePromise = null;
   const state = {
@@ -18,6 +19,10 @@
 
   function getContext() {
     return globalThis.SillyTavern?.getContext?.() ?? null;
+  }
+
+  function isEnabled() {
+    return state.context?.accountStorage?.getItem(ENABLED_STORAGE_KEY) !== 'false';
   }
 
   function getScriptModule() {
@@ -414,6 +419,7 @@
   }
 
   async function enhanceWelcomePanel(panel) {
+    if (!isEnabled()) return;
     if (panel.dataset.stcaState) return;
     panel.dataset.stcaState = 'checking';
     try {
@@ -642,7 +648,65 @@
   }
 
   function scanWelcomePanels() {
+    buildSettingsPanel();
+    if (!isEnabled()) return;
     document.querySelectorAll('.welcomePanel').forEach(panel => void enhanceWelcomePanel(panel));
+  }
+
+  function restoreNativeWelcome() {
+    closeModal();
+    document.querySelectorAll('.welcomePanel').forEach(panel => {
+      panel.querySelectorAll('.stca-home, .stca-server-warning').forEach(element => element.remove());
+      panel.querySelectorAll('.stca-core-hidden').forEach(element => element.classList.remove('stca-core-hidden'));
+      panel.classList.remove('stca-enhanced');
+      delete panel.dataset.stcaState;
+    });
+  }
+
+  function setEnabled(enabled) {
+    state.context.accountStorage.setItem(ENABLED_STORAGE_KEY, String(enabled));
+    if (enabled) {
+      state.catalog = null;
+      scanWelcomePanels();
+      toastr.success('角色聊天档案已启用。');
+    } else {
+      restoreNativeWelcome();
+      toastr.info('已恢复酒馆原生首页。');
+    }
+  }
+
+  function buildSettingsPanel() {
+    if (document.getElementById('stca-settings')) return;
+    const settingsRoot = document.getElementById('extensions_settings');
+    if (!settingsRoot) return;
+
+    const container = document.createElement('div');
+    container.id = 'stca-settings';
+    container.className = 'extension_container';
+    const drawer = document.createElement('div');
+    drawer.className = 'inline-drawer';
+    const header = document.createElement('div');
+    header.className = 'inline-drawer-toggle inline-drawer-header';
+    const title = document.createElement('b');
+    title.textContent = '角色聊天档案';
+    const arrow = document.createElement('i');
+    arrow.className = 'inline-drawer-icon fa-solid fa-circle-chevron-down down';
+    header.append(title, arrow);
+    const content = document.createElement('div');
+    content.className = 'inline-drawer-content';
+    const row = document.createElement('label');
+    row.className = 'stca-setting-row';
+    const text = document.createElement('span');
+    text.textContent = '启用角色聊天档案';
+    const toggle = document.createElement('input');
+    toggle.type = 'checkbox';
+    toggle.checked = isEnabled();
+    toggle.addEventListener('change', () => setEnabled(toggle.checked));
+    row.append(text, toggle);
+    content.append(row);
+    drawer.append(header, content);
+    container.append(drawer);
+    settingsRoot.append(container);
   }
 
   function initialize() {
@@ -651,10 +715,12 @@
       setTimeout(initialize, 250);
       return;
     }
+    buildSettingsPanel();
     scanWelcomePanels();
     state.observer = new MutationObserver(scanWelcomePanels);
     state.observer.observe(document.body, { childList: true, subtree: true });
     const rememberChangedChat = chatId => {
+      if (!isEnabled()) return;
       const context = getContext();
       const currentId = String(chatId || context?.chatId || '').replace(/\.jsonl$/i, '');
       if (!context || !currentId) return;
