@@ -2,6 +2,14 @@
 
 适用于 SillyTavern 1.16.0 及以上版本的聊天归档扩展。
 
+## 兼容性
+
+- 最低支持版本：SillyTavern `1.16.0`。
+- 已实测版本：SillyTavern `1.16.0 'release' (c536bfc7f)`，Windows 本地部署。
+- 需要在 `config.yaml` 中启用 `enableServerPlugins: true`。
+- 不建议在 1.16.0 以前的版本安装：旧版首页结构和 `accountStorage` 等前端接口可能不同。
+- 服务器端 JSONL 尾部读取不依赖特定预设或消息正文标签；前端首页结构若在未来酒馆版本中变化，可能需要跟随更新。
+
 它把酒馆首页原本平铺的聊天文件改成：
 
 - 最多 3 个独立聊天文件置顶快捷入口。
@@ -122,3 +130,4 @@ node --test test/*.test.js
 ## 许可
 
 MIT
+
