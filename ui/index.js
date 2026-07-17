@@ -483,7 +483,7 @@
       console.warn(`[${MODULE_NAME}] Server plugin is unavailable`, error);
       const warning = document.createElement('div');
       warning.className = 'stca-server-warning';
-      warning.textContent = '角色聊天档案：服务器插件未启用，已保留酒馆原首页。';
+      warning.textContent = '酒馆首页文件分类：服务器插件未启用，已保留酒馆原首页。';
       panel.append(warning);
     }
   }
@@ -728,7 +728,7 @@
     if (enabled) {
       state.catalog = null;
       scanWelcomePanels();
-      toastr.success('角色聊天档案已启用。');
+      toastr.success('酒馆首页文件分类已启用。');
     } else {
       restoreNativeWelcome();
       toastr.info('已恢复酒馆原生首页。');
@@ -748,7 +748,7 @@
     const header = document.createElement('div');
     header.className = 'inline-drawer-toggle inline-drawer-header';
     const title = document.createElement('b');
-    title.textContent = '角色聊天档案';
+    title.textContent = '酒馆首页文件分类';
     const arrow = document.createElement('i');
     arrow.className = 'inline-drawer-icon fa-solid fa-circle-chevron-down down';
     header.append(title, arrow);
@@ -788,7 +788,7 @@
       content.append(row);
     };
 
-    addCheckbox('启用角色聊天档案', isEnabled(), setEnabled);
+    addCheckbox('启用酒馆首页文件分类', isEnabled(), setEnabled);
     const divider = () => {
       const line = document.createElement('hr');
       line.className = 'stca-settings-divider';

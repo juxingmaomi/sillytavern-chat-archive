@@ -1,10 +1,10 @@
 {
-  "display_name": "角色聊天档案",
+  "display_name": "酒馆首页文件分类",
   "loading_order": 50,
   "js": "ui/index.js",
   "css": "ui/style.css",
   "author": "Codex",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "homePage": "https://github.com/juxingmaomi/sillytavern-chat-archive",
   "auto_update": true,
   "minimum_client_version": "1.16.0"
