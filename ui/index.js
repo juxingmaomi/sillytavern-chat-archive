@@ -6,7 +6,17 @@
   const PINNED_STORAGE_KEY = 'pinnedChats';
   const RECENT_OPENED_STORAGE_KEY = 'chatArchiveLastOpened';
   const ENABLED_STORAGE_KEY = 'chatArchiveEnabled';
-  const MAX_PINNED = 3;
+  const SETTINGS_STORAGE_KEY = 'chatArchiveSettings';
+  const DEFAULT_SETTINGS = Object.freeze({
+    showPinned: true,
+    showRecent: true,
+    showArchive: true,
+    maxPinned: 3,
+    characterSort: 'recent',
+    chatSort: 'recent',
+    deleteEnabled: true,
+    requireDeleteName: false,
+  });
   let scriptModulePromise = null;
   const state = {
     context: null,
@@ -23,6 +33,32 @@
 
   function isEnabled() {
     return state.context?.accountStorage?.getItem(ENABLED_STORAGE_KEY) !== 'false';
+  }
+
+  function getSettings() {
+    const raw = state.context?.accountStorage?.getItem(SETTINGS_STORAGE_KEY);
+    try {
+      const parsed = raw ? JSON.parse(raw) : {};
+      return {
+        ...DEFAULT_SETTINGS,
+        ...(parsed && typeof parsed === 'object' ? parsed : {}),
+        maxPinned: Math.min(10, Math.max(1, Number(parsed?.maxPinned) || DEFAULT_SETTINGS.maxPinned)),
+      };
+    } catch {
+      return { ...DEFAULT_SETTINGS };
+    }
+  }
+
+  function updateSettings(patch) {
+    const settings = { ...getSettings(), ...patch };
+    state.context.accountStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    if (Object.hasOwn(patch, 'maxPinned')) {
+      const pinnedEntries = Object.entries(getPinnedState()).slice(0, settings.maxPinned);
+      state.context.accountStorage.setItem(PINNED_STORAGE_KEY, JSON.stringify(Object.fromEntries(pinnedEntries)));
+    }
+    state.catalog = null;
+    restoreNativeWelcome();
+    if (isEnabled()) scanWelcomePanels();
   }
 
   function getScriptModule() {
@@ -70,8 +106,9 @@
   function setPinned(item, pinned) {
     const pinnedState = getPinnedState();
     const key = getPinnedKey(item);
-    if (pinned && !Object.hasOwn(pinnedState, key) && Object.keys(pinnedState).length >= MAX_PINNED) {
-      toastr.warning(`最多置顶 ${MAX_PINNED} 个聊天，请先取消一个置顶。`);
+    const maxPinned = getSettings().maxPinned;
+    if (pinned && !Object.hasOwn(pinnedState, key) && Object.keys(pinnedState).length >= maxPinned) {
+      toastr.warning(`最多置顶 ${maxPinned} 个聊天，请先取消一个置顶。`);
       return false;
     }
     if (pinned) {
@@ -257,7 +294,7 @@
     const pinned = Object.values(pinnedState);
     if (!pinned.length) return [];
     const data = await requestApi('pinned', { pinned });
-    const chats = Array.isArray(data.chats) ? data.chats.slice(0, MAX_PINNED) : [];
+    const chats = Array.isArray(data.chats) ? data.chats.slice(0, getSettings().maxPinned) : [];
     const cleanedState = Object.fromEntries(chats.map(chat => [getPinnedKey(chat), {
       group: chat.group || '',
       avatar: chat.avatar || '',
@@ -352,25 +389,45 @@
     return row;
   }
 
+  function sortCharacters(entries) {
+    const mode = getSettings().characterSort;
+    return [...entries].sort((a, b) => {
+      if (mode === 'name') return getDisplayName(a).localeCompare(getDisplayName(b), 'zh-CN');
+      if (mode === 'count') return b.chat_count - a.chat_count;
+      if (mode === 'size') return b.total_bytes - a.total_bytes;
+      return b.latest_mtime - a.latest_mtime;
+    });
+  }
+
+  function sortChats(chats) {
+    const mode = getSettings().chatSort;
+    return [...chats].sort((a, b) => {
+      if (mode === 'name') return a.file_name.localeCompare(b.file_name, 'zh-CN');
+      if (mode === 'oldest') return a.modified_at - b.modified_at;
+      if (mode === 'size') return b.file_size - a.file_size;
+      return b.modified_at - a.modified_at;
+    });
+  }
+
   async function refreshHomeSections(panel = document.querySelector('.welcomePanel.stca-enhanced')) {
     if (!panel) return;
     const pinnedList = panel.querySelector('.stca-pinned-list');
     const recentList = panel.querySelector('.stca-recent-list');
     const characterList = panel.querySelector('.stca-character-list');
-    if (!pinnedList || !recentList || !characterList) return;
-    pinnedList.replaceChildren(createEmpty('正在读取置顶聊天...'));
-    recentList.replaceChildren(createEmpty('正在读取最近打开...'));
-    characterList.replaceChildren(createEmpty('正在整理角色聊天...'));
+    if (!pinnedList && !recentList && !characterList) return;
+    pinnedList?.replaceChildren(createEmpty('正在读取置顶聊天...'));
+    recentList?.replaceChildren(createEmpty('正在读取最近打开...'));
+    characterList?.replaceChildren(createEmpty('正在整理角色聊天...'));
     try {
       const [pinnedChats, recentChat, catalogData] = await Promise.all([
-        fetchPinnedChats(),
-        fetchRecentOpenedChat(),
-        state.catalog ? Promise.resolve({ characters: state.catalog }) : requestApi('catalog', {}),
+        pinnedList ? fetchPinnedChats() : Promise.resolve([]),
+        recentList ? fetchRecentOpenedChat() : Promise.resolve(null),
+        characterList ? (state.catalog ? Promise.resolve({ characters: state.catalog }) : requestApi('catalog', {})) : Promise.resolve({ characters: [] }),
       ]);
-      state.catalog = catalogData.characters || [];
-      pinnedList.replaceChildren(...(pinnedChats.length ? pinnedChats.map(createPinnedRow) : [createEmpty('还没有置顶聊天')]));
-      recentList.replaceChildren(...(recentChat ? [createRecentRow(recentChat)] : [createEmpty('还没有最近打开的聊天')]));
-      characterList.replaceChildren(...(state.catalog.length ? state.catalog.map(createCharacterRow) : [createEmpty('没有找到角色聊天文件')]));
+      if (characterList) state.catalog = catalogData.characters || [];
+      pinnedList?.replaceChildren(...(pinnedChats.length ? pinnedChats.map(createPinnedRow) : [createEmpty('还没有置顶聊天')]));
+      recentList?.replaceChildren(...(recentChat ? [createRecentRow(recentChat)] : [createEmpty('还没有最近打开的聊天')]));
+      characterList?.replaceChildren(...(state.catalog.length ? sortCharacters(state.catalog).map(createCharacterRow) : [createEmpty('没有找到角色聊天文件')]));
     } catch (error) {
       console.error(`[${MODULE_NAME}] Failed to load archive home`, error);
       characterList.replaceChildren(createEmpty(`读取失败：${error.message}`));
@@ -378,6 +435,7 @@
   }
 
   function buildHomeSections(panel) {
+    const settings = getSettings();
     const container = document.createElement('section');
     container.className = 'stca-home';
 
@@ -385,7 +443,7 @@
     pinnedSection.className = 'stca-section';
     const pinnedTitle = document.createElement('div');
     pinnedTitle.className = 'stca-section-title';
-    pinnedTitle.innerHTML = '<span><i class="fa-solid fa-thumbtack"></i> 置顶聊天</span><small>最多 3 个</small>';
+    pinnedTitle.innerHTML = `<span><i class="fa-solid fa-thumbtack"></i> 置顶聊天</span><small>最多 ${settings.maxPinned} 个</small>`;
     const pinnedList = document.createElement('div');
     pinnedList.className = 'stca-pinned-list';
     pinnedSection.append(pinnedTitle, pinnedList);
@@ -413,7 +471,9 @@
     recentList.className = 'stca-recent-list';
     recentSection.append(recentTitle, recentList);
 
-    container.append(pinnedSection, recentSection, archiveSection);
+    if (settings.showPinned) container.append(pinnedSection);
+    if (settings.showRecent) container.append(recentSection);
+    if (settings.showArchive) container.append(archiveSection);
     panel.append(container);
     void refreshHomeSections(panel);
   }
@@ -458,6 +518,11 @@
       title.textContent = '删除聊天文件？';
       const text = document.createElement('p');
       text.textContent = `将永久删除“${fileName}”。如果这是该角色最后一个聊天，空归档文件夹也会消失。角色卡不会被删除。`;
+      const requireName = getSettings().requireDeleteName;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'text_pole stca-delete-confirm-input';
+      input.placeholder = '输入完整聊天文件名以确认';
       const actions = document.createElement('div');
       actions.className = 'stca-confirm-actions';
       const cancel = document.createElement('button');
@@ -468,6 +533,12 @@
       confirm.type = 'button';
       confirm.className = 'menu_button stca-danger-button';
       confirm.textContent = '删除';
+      confirm.disabled = requireName;
+      if (requireName) {
+        input.addEventListener('input', () => {
+          confirm.disabled = input.value !== fileName;
+        });
+      }
       const finish = value => {
         overlay.remove();
         resolve(value);
@@ -478,10 +549,12 @@
         if (event.target === overlay) finish(false);
       });
       actions.append(cancel, confirm);
-      dialog.append(title, text, actions);
+      dialog.append(title, text);
+      if (requireName) dialog.append(input);
+      dialog.append(actions);
       overlay.append(dialog);
       document.body.append(overlay);
-      confirm.focus();
+      (requireName ? input : confirm).focus();
     });
   }
 
@@ -582,7 +655,8 @@
       }
     });
     deleteButton.classList.add('stca-delete-button');
-    actions.append(pinButton, previewButton, openButton, deleteButton);
+    actions.append(pinButton, previewButton, openButton);
+    if (getSettings().deleteEnabled) actions.append(deleteButton);
     row.append(content, actions);
     return row;
   }
@@ -633,7 +707,7 @@
     ui.list.append(createEmpty('正在读取聊天文件...'));
     try {
       const data = await requestApi('chats', { avatar });
-      const rows = (data.chats || []).map(chat => createChatRow(chat, avatar, ui.preview));
+      const rows = sortChats(data.chats || []).map(chat => createChatRow(chat, avatar, ui.preview));
       ui.list.replaceChildren(...(rows.length ? rows : [createEmpty('这个角色还没有聊天文件')]));
       ui.search.addEventListener('input', () => {
         const query = ui.search.value.trim().toLowerCase();
@@ -694,16 +768,70 @@
     header.append(title, arrow);
     const content = document.createElement('div');
     content.className = 'inline-drawer-content';
-    const row = document.createElement('label');
-    row.className = 'stca-setting-row';
-    const text = document.createElement('span');
-    text.textContent = '启用角色聊天档案';
-    const toggle = document.createElement('input');
-    toggle.type = 'checkbox';
-    toggle.checked = isEnabled();
-    toggle.addEventListener('change', () => setEnabled(toggle.checked));
-    row.append(text, toggle);
-    content.append(row);
+    const settings = getSettings();
+    const addCheckbox = (label, checked, onChange, disabled = false) => {
+      const row = document.createElement('label');
+      row.className = 'stca-setting-row';
+      const text = document.createElement('span');
+      text.textContent = label;
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = checked;
+      input.disabled = disabled;
+      input.addEventListener('change', () => onChange(input.checked));
+      row.append(text, input);
+      content.append(row);
+      return input;
+    };
+    const addSelect = (label, value, options, onChange) => {
+      const row = document.createElement('label');
+      row.className = 'stca-setting-row';
+      const text = document.createElement('span');
+      text.textContent = label;
+      const select = document.createElement('select');
+      select.className = 'text_pole';
+      for (const [optionValue, optionText] of options) {
+        const option = document.createElement('option');
+        option.value = optionValue;
+        option.textContent = optionText;
+        option.selected = optionValue === String(value);
+        select.append(option);
+      }
+      select.addEventListener('change', () => onChange(select.value));
+      row.append(text, select);
+      content.append(row);
+    };
+
+    addCheckbox('启用角色聊天档案', isEnabled(), setEnabled);
+    const divider = () => {
+      const line = document.createElement('hr');
+      line.className = 'stca-settings-divider';
+      content.append(line);
+    };
+    divider();
+    addCheckbox('显示置顶聊天', settings.showPinned, value => updateSettings({ showPinned: value }));
+    addCheckbox('显示最近打开', settings.showRecent, value => updateSettings({ showRecent: value }));
+    addCheckbox('显示角色归档', settings.showArchive, value => updateSettings({ showArchive: value }));
+    addSelect('最大置顶数量', settings.maxPinned, Array.from({ length: 10 }, (_, index) => [String(index + 1), String(index + 1)]), value => updateSettings({ maxPinned: Number(value) }));
+    divider();
+    addSelect('角色排序', settings.characterSort, [
+      ['recent', '最近聊天'],
+      ['name', '角色名称'],
+      ['count', '聊天数量'],
+      ['size', '占用空间'],
+    ], value => updateSettings({ characterSort: value }));
+    addSelect('聊天文件排序', settings.chatSort, [
+      ['recent', '最新修改'],
+      ['oldest', '最早修改'],
+      ['name', '文件名称'],
+      ['size', '文件大小'],
+    ], value => updateSettings({ chatSort: value }));
+    divider();
+    const deleteNameToggle = addCheckbox('删除时需输入文件名', settings.requireDeleteName, value => updateSettings({ requireDeleteName: value }), !settings.deleteEnabled);
+    addCheckbox('显示删除按钮', settings.deleteEnabled, value => {
+      deleteNameToggle.disabled = !value;
+      updateSettings({ deleteEnabled: value });
+    });
     drawer.append(header, content);
     container.append(drawer);
     settingsRoot.append(container);
