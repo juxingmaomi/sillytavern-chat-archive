@@ -261,7 +261,7 @@ function getUserDirectories(request) {
 
 async function init(router) {
   router.get('/health', (_request, response) => {
-    response.json({ ok: true, version: '0.5.3' });
+    response.json({ ok: true, version: '0.5.4' });
   });
 
   router.post('/catalog', async (request, response) => {

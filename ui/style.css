@@ -222,6 +222,7 @@
 }
 
 .stca-modal-header {
+  flex: 0 0 auto;
   justify-content: space-between;
   min-height: 48px;
   padding: 8px 12px;
@@ -356,8 +357,16 @@
 }
 
 .stca-quick-preview-pane {
+  flex: 1 1 auto;
   min-height: 180px;
+  min-width: 0;
   padding: 16px;
+  overscroll-behavior: contain;
+}
+
+.stca-quick-preview-pane .stca-preview-messages {
+  min-width: 0;
+  width: 100%;
 }
 
 .stca-settings-divider {
@@ -418,9 +427,26 @@
 
   .stca-modal {
     width: 100%;
+    height: 100vh;
     height: 100dvh;
     border: 0;
     border-radius: 0;
+  }
+
+  .stca-quick-preview-modal {
+    max-height: none;
+  }
+
+  .stca-quick-preview-modal .stca-modal-header {
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+
+  .stca-quick-preview-pane {
+    min-height: 0;
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    padding-left: max(12px, env(safe-area-inset-left));
+    -webkit-overflow-scrolling: touch;
   }
 
   .stca-modal-body {
