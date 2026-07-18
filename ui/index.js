@@ -2,6 +2,7 @@
   'use strict';
 
   const MODULE_NAME = 'chat_archive';
+  const VERSION = '0.5.5';
   const API_ROOT = '/api/plugins/chat-archive';
   const PINNED_STORAGE_KEY = 'pinnedChats';
   const RECENT_OPENED_STORAGE_KEY = 'chatArchiveLastOpened';
@@ -395,7 +396,7 @@
   async function showQuickPreview(item) {
     closeModal();
     const overlay = document.createElement('div');
-    overlay.className = 'stca-overlay';
+    overlay.className = 'stca-overlay stca-quick-preview-overlay';
     const modal = document.createElement('div');
     modal.className = 'stca-modal stca-quick-preview-modal';
     modal.setAttribute('role', 'dialog');
@@ -851,9 +852,15 @@
     header.className = 'inline-drawer-toggle inline-drawer-header';
     const title = document.createElement('b');
     title.textContent = '酒馆首页文件分类';
+    const version = document.createElement('span');
+    version.className = 'stca-version-badge';
+    version.textContent = `v${VERSION}`;
     const arrow = document.createElement('i');
     arrow.className = 'inline-drawer-icon fa-solid fa-circle-chevron-down down';
-    header.append(title, arrow);
+    const heading = document.createElement('span');
+    heading.className = 'stca-settings-heading';
+    heading.append(title, version);
+    header.append(heading, arrow);
     const content = document.createElement('div');
     content.className = 'inline-drawer-content';
     const settings = getSettings();
