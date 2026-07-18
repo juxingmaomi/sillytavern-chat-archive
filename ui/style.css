@@ -223,6 +223,9 @@
 
 .stca-modal-header {
   flex: 0 0 auto;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
   justify-content: space-between;
   min-height: 48px;
   padding: 8px 12px;
@@ -231,6 +234,7 @@
 }
 
 .stca-modal-title {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -362,6 +366,8 @@
   min-height: 0;
   min-width: 0;
   height: 100%;
+  width: 100%;
+  box-sizing: border-box;
   overflow-y: auto;
   padding: 16px;
   overscroll-behavior: contain;
@@ -370,6 +376,12 @@
 .stca-quick-preview-pane .stca-preview-messages {
   min-width: 0;
   width: 100%;
+}
+
+.stca-quick-preview-pane .stca-message-row,
+.stca-quick-preview-pane .stca-message-bubble {
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .stca-settings-divider {
@@ -447,7 +459,9 @@
 
   .stca-quick-preview-overlay {
     align-items: stretch;
-    width: 100vw;
+    right: 0;
+    left: 0;
+    width: auto;
     height: 100vh;
     height: 100dvh;
     overflow: hidden;
@@ -465,7 +479,8 @@
     position: relative;
     inset: auto;
     grid-template-rows: auto minmax(0, 1fr);
-    width: 100vw;
+    width: 100%;
+    max-width: 100%;
     min-width: 0;
     height: 100vh;
     height: 100dvh;
@@ -476,7 +491,12 @@
   }
 
   .stca-quick-preview-modal .stca-modal-header {
+    overflow: hidden;
     padding-top: max(8px, env(safe-area-inset-top));
+  }
+
+  .stca-quick-preview-modal .stca-modal-header .stca-icon-button {
+    flex: 0 0 32px;
   }
 
   .stca-quick-preview-pane {
@@ -489,6 +509,13 @@
     padding-bottom: max(16px, env(safe-area-inset-bottom));
     padding-left: max(12px, env(safe-area-inset-left));
     -webkit-overflow-scrolling: touch;
+  }
+
+  .stca-quick-preview-pane .stca-message-bubble {
+    width: 100%;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .stca-modal-body {
