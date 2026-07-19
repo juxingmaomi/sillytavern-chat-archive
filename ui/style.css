@@ -563,9 +563,30 @@ html.stca-modal-open body {
     padding-left: max(12px, env(safe-area-inset-left));
   }
 
-  .stca-modal.stca-preview-mode .stca-modal-title,
   .stca-modal.stca-preview-mode .stca-toolbar > i,
   .stca-modal.stca-preview-mode .stca-search {
+    display: none;
+  }
+
+  .stca-modal.stca-preview-mode .stca-modal-title {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    padding: 0 2px;
+    font-size: clamp(12px, calc(var(--mainFontSize) * 0.72), 16px);
+    text-align: center;
+  }
+
+  .stca-modal.stca-preview-mode .stca-modal-character-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .stca-modal.stca-preview-mode .stca-modal-title-suffix {
     display: none;
   }
 

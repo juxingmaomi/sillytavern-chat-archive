@@ -2,7 +2,7 @@
   'use strict';
 
   const MODULE_NAME = 'chat_archive';
-  const VERSION = '0.5.9';
+  const VERSION = '0.5.10';
   const API_ROOT = '/api/plugins/chat-archive';
   const PINNED_STORAGE_KEY = 'pinnedChats';
   const RECENT_OPENED_STORAGE_KEY = 'chatArchiveLastOpened';
@@ -692,7 +692,13 @@
     header.className = 'stca-modal-header';
     const heading = document.createElement('div');
     heading.className = 'stca-modal-title';
-    heading.textContent = `${characterName} · 全部聊天`;
+    const characterTitle = document.createElement('span');
+    characterTitle.className = 'stca-modal-character-name';
+    characterTitle.textContent = characterName;
+    const titleSuffix = document.createElement('span');
+    titleSuffix.className = 'stca-modal-title-suffix';
+    titleSuffix.textContent = ' · 全部聊天';
+    heading.append(characterTitle, titleSuffix);
     const mobileBack = createIconButton('fa-arrow-left', '返回聊天文件列表', () => returnToChatList(body, preview));
     mobileBack.classList.add('stca-mobile-preview-back');
     const mobileOpen = document.createElement('button');
