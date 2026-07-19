@@ -1,6 +1,6 @@
 {
   "name": "sillytavern-chat-archive",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "description": "Character-grouped chat archive with fast two-message previews for SillyTavern.",
   "main": "index.js",
   "type": "commonjs",
