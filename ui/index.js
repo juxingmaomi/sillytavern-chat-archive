@@ -2,7 +2,7 @@
   'use strict';
 
   const MODULE_NAME = 'chat_archive';
-  const VERSION = '0.5.8';
+  const VERSION = '0.5.9';
   const API_ROOT = '/api/plugins/chat-archive';
   const PINNED_STORAGE_KEY = 'pinnedChats';
   const RECENT_OPENED_STORAGE_KEY = 'chatArchiveLastOpened';
@@ -417,8 +417,7 @@
     overlay.addEventListener('click', event => {
       if (event.target === overlay) closeModal();
     });
-    document.body.append(overlay);
-    state.modal = overlay;
+    activateModal(overlay);
 
     try {
       const data = await requestApi('preview', {
@@ -694,8 +693,26 @@
     const heading = document.createElement('div');
     heading.className = 'stca-modal-title';
     heading.textContent = `${characterName} · 全部聊天`;
+    const mobileBack = createIconButton('fa-arrow-left', '返回聊天文件列表', () => returnToChatList(body, preview));
+    mobileBack.classList.add('stca-mobile-preview-back');
+    const mobileOpen = document.createElement('button');
+    mobileOpen.type = 'button';
+    mobileOpen.className = 'menu_button menu_button_icon stca-mobile-preview-open';
+    mobileOpen.title = '打开聊天';
+    mobileOpen.setAttribute('aria-label', '打开聊天');
+    mobileOpen.innerHTML = '<i class="fa-solid fa-arrow-right"></i><span>打开聊天</span>';
+    mobileOpen.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (mobileOpen.dataset.fileName) {
+        void openChat({ avatar: state.selectedAvatar, file_name: mobileOpen.dataset.fileName });
+      }
+    });
     const close = createIconButton('fa-xmark', '关闭', closeModal);
-    header.append(heading, close);
+    const headerActions = document.createElement('div');
+    headerActions.className = 'stca-modal-actions';
+    headerActions.append(mobileOpen, close);
+    header.append(mobileBack, heading, headerActions);
 
     const toolbar = document.createElement('div');
     toolbar.className = 'stca-toolbar';
@@ -705,7 +722,9 @@
     search.type = 'search';
     search.className = 'text_pole stca-search';
     search.placeholder = '搜索聊天文件名';
-    toolbar.append(searchIcon, search);
+    const previewFileName = document.createElement('div');
+    previewFileName.className = 'stca-preview-file-name';
+    toolbar.append(searchIcon, search, previewFileName);
 
     const body = document.createElement('div');
     body.className = 'stca-modal-body stca-no-preview';
@@ -722,6 +741,19 @@
     });
     activateModal(overlay);
     return { overlay, list, preview, search };
+  }
+
+  function returnToChatList(modalBody, pane) {
+    const modal = modalBody?.closest('.stca-modal');
+    modal?.classList.remove('stca-preview-mode');
+    modalBody?.classList.remove('stca-preview-active');
+    modalBody?.classList.add('stca-no-preview');
+    modalBody?.querySelectorAll('.stca-chat-row.selected').forEach(row => row.classList.remove('selected'));
+    const mobileOpen = modal?.querySelector('.stca-mobile-preview-open');
+    if (mobileOpen) delete mobileOpen.dataset.fileName;
+    const fileName = modal?.querySelector('.stca-preview-file-name');
+    if (fileName) fileName.textContent = '';
+    pane.replaceChildren(createEmpty('选择一个聊天文件查看最后两条消息'));
   }
 
   function createChatRow(chat, avatar, previewPane) {
@@ -788,6 +820,8 @@
 
   async function showPreview(avatar, fileName, pane, selectedRow) {
     const modalBody = pane.closest('.stca-modal-body');
+    const modal = modalBody?.closest('.stca-modal');
+    modal?.classList.add('stca-preview-mode');
     modalBody?.classList.remove('stca-no-preview');
     modalBody?.classList.add('stca-preview-active');
     modalBody?.querySelectorAll('.stca-chat-row.selected').forEach(row => row.classList.remove('selected'));
@@ -795,12 +829,7 @@
 
     const header = document.createElement('div');
     header.className = 'stca-preview-header';
-    const backButton = createIconButton('fa-arrow-left', '返回聊天文件列表', () => {
-      modalBody?.classList.remove('stca-preview-active');
-      modalBody?.classList.add('stca-no-preview');
-      modalBody?.querySelectorAll('.stca-chat-row.selected').forEach(row => row.classList.remove('selected'));
-      pane.replaceChildren(createEmpty('选择一个聊天文件查看最后两条消息'));
-    });
+    const backButton = createIconButton('fa-arrow-left', '返回聊天文件列表', () => returnToChatList(modalBody, pane));
     backButton.classList.add('stca-preview-back');
     const title = document.createElement('strong');
     title.textContent = fileName;
@@ -810,6 +839,10 @@
     openButton.innerHTML = '<i class="fa-solid fa-arrow-right"></i><span>打开聊天</span>';
     openButton.addEventListener('click', () => void openChat({ avatar, file_name: fileName }));
     header.append(backButton, title, openButton);
+    const mobileOpen = modal?.querySelector('.stca-mobile-preview-open');
+    if (mobileOpen) mobileOpen.dataset.fileName = fileName;
+    const mobileFileName = modal?.querySelector('.stca-preview-file-name');
+    if (mobileFileName) mobileFileName.textContent = fileName;
     pane.replaceChildren(header, createEmpty('正在读取最后两条消息...'));
     pane.scrollTop = 0;
 
