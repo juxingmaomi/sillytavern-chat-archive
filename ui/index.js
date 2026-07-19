@@ -2,7 +2,7 @@
   'use strict';
 
   const MODULE_NAME = 'chat_archive';
-  const VERSION = '0.5.6';
+  const VERSION = '0.5.7';
   const API_ROOT = '/api/plugins/chat-archive';
   const PINNED_STORAGE_KEY = 'pinnedChats';
   const RECENT_OPENED_STORAGE_KEY = 'chatArchiveLastOpened';
@@ -24,6 +24,7 @@
     catalog: null,
     observer: null,
     modal: null,
+    modalViewportCleanup: null,
     selectedAvatar: '',
     openingChat: false,
   };
@@ -594,6 +595,39 @@
     state.modal?.remove();
     state.modal = null;
     state.selectedAvatar = '';
+    state.modalViewportCleanup?.();
+    state.modalViewportCleanup = null;
+    document.documentElement.classList.remove('stca-modal-open');
+  }
+
+  function activateModal(overlay) {
+    if (window.matchMedia('(max-width: 760px)').matches && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+
+    const root = document.documentElement;
+    const viewport = window.visualViewport;
+    const syncViewport = () => {
+      root.style.setProperty('--stca-modal-top', `${Math.round(viewport?.offsetTop || 0)}px`);
+      root.style.setProperty('--stca-modal-left', `${Math.round(viewport?.offsetLeft || 0)}px`);
+      root.style.setProperty('--stca-modal-width', `${Math.round(viewport?.width || window.innerWidth)}px`);
+      root.style.setProperty('--stca-modal-height', `${Math.round(viewport?.height || window.innerHeight)}px`);
+    };
+    syncViewport();
+    viewport?.addEventListener('resize', syncViewport);
+    viewport?.addEventListener('scroll', syncViewport);
+    state.modalViewportCleanup = () => {
+      viewport?.removeEventListener('resize', syncViewport);
+      viewport?.removeEventListener('scroll', syncViewport);
+      root.style.removeProperty('--stca-modal-top');
+      root.style.removeProperty('--stca-modal-left');
+      root.style.removeProperty('--stca-modal-width');
+      root.style.removeProperty('--stca-modal-height');
+    };
+
+    document.documentElement.classList.add('stca-modal-open');
+    document.body.append(overlay);
+    state.modal = overlay;
   }
 
   function confirmDelete(fileName) {
@@ -674,7 +708,7 @@
     toolbar.append(searchIcon, search);
 
     const body = document.createElement('div');
-    body.className = 'stca-modal-body';
+    body.className = 'stca-modal-body stca-no-preview';
     const list = document.createElement('div');
     list.className = 'stca-chat-list';
     const preview = document.createElement('div');
@@ -686,8 +720,7 @@
     overlay.addEventListener('click', event => {
       if (event.target === overlay) closeModal();
     });
-    document.body.append(overlay);
-    state.modal = overlay;
+    activateModal(overlay);
     return { overlay, list, preview, search };
   }
 
@@ -730,6 +763,7 @@
         removeChatReferences(pinItem);
         row.remove();
         previewPane.replaceChildren(createEmpty('聊天文件已删除'));
+        previewPane.closest('.stca-modal-body')?.classList.add('stca-no-preview');
         state.catalog = null;
         await refreshHomeSections();
         if (result.remaining_count === 0) {
@@ -751,6 +785,7 @@
   }
 
   async function showPreview(avatar, fileName, pane, selectedRow) {
+    pane.closest('.stca-modal-body')?.classList.remove('stca-no-preview');
     pane.replaceChildren(createEmpty('正在读取最后两条消息...'));
     pane.closest('.stca-modal-body')?.querySelectorAll('.stca-chat-row.selected').forEach(row => row.classList.remove('selected'));
     selectedRow.classList.add('selected');
@@ -804,7 +839,7 @@
           row.hidden = query && !row.dataset.search.includes(query);
         });
       });
-      ui.search.focus();
+      if (!window.matchMedia('(max-width: 760px)').matches) ui.search.focus();
     } catch (error) {
       ui.list.replaceChildren(createEmpty(`读取失败：${error.message}`));
     }

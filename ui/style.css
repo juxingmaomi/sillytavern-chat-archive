@@ -2,6 +2,12 @@
   display: none !important;
 }
 
+html.stca-modal-open,
+html.stca-modal-open body {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
 .stca-home {
   display: grid;
   gap: 12px;
@@ -454,7 +460,26 @@
 
 @media (max-width: 760px) {
   .stca-overlay {
+    position: fixed !important;
+    top: var(--stca-modal-top, 0) !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: var(--stca-modal-left, 0) !important;
+    align-items: stretch;
+    justify-content: stretch;
+    width: var(--stca-modal-width, 100vw) !important;
+    height: var(--stca-modal-height, 100dvh) !important;
+    max-height: var(--stca-modal-height, 100dvh) !important;
     padding: 0;
+    overflow: hidden !important;
+  }
+
+  html.stca-modal-open .stca-overlay {
+    z-index: 2147483000 !important;
+  }
+
+  html.stca-modal-open .stca-confirm-overlay {
+    z-index: 2147483001 !important;
   }
 
   .stca-quick-preview-overlay {
@@ -468,9 +493,14 @@
   }
 
   .stca-modal {
-    width: 100%;
-    height: 100vh;
-    height: 100dvh;
+    position: relative;
+    inset: auto;
+    width: 100% !important;
+    max-width: 100%;
+    height: 100% !important;
+    max-height: 100%;
+    margin: 0;
+    box-sizing: border-box;
     border: 0;
     border-radius: 0;
   }
@@ -520,12 +550,40 @@
 
   .stca-modal-body {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(220px, 0.55fr) minmax(220px, 0.45fr);
+    grid-template-rows: minmax(0, 0.55fr) minmax(0, 0.45fr);
+    grid-template-areas:
+      'list'
+      'preview';
+    overflow: hidden;
+  }
+
+  .stca-modal-body.stca-no-preview {
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: 'list';
+  }
+
+  .stca-modal-body.stca-no-preview .stca-preview-pane {
+    display: none;
   }
 
   .stca-chat-list {
+    grid-area: list;
+    min-height: 0;
     border-right: 0;
     border-bottom: 1px solid var(--SmartThemeBorderColor);
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .stca-preview-pane {
+    grid-area: preview;
+    min-height: 0;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .stca-modal-body.stca-no-preview .stca-chat-list {
+    border-bottom: 0;
   }
 
   .stca-character-size {
