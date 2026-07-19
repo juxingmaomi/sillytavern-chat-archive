@@ -2,7 +2,7 @@
   'use strict';
 
   const MODULE_NAME = 'chat_archive';
-  const VERSION = '0.5.10';
+  const VERSION = '0.5.11';
   const API_ROOT = '/api/plugins/chat-archive';
   const PINNED_STORAGE_KEY = 'pinnedChats';
   const RECENT_OPENED_STORAGE_KEY = 'chatArchiveLastOpened';
@@ -599,6 +599,26 @@
     document.documentElement.classList.remove('stca-modal-open');
   }
 
+  function fitPreviewCharacterTitle(modal) {
+    const title = modal?.querySelector('.stca-modal-title');
+    const characterName = title?.querySelector('.stca-modal-character-name');
+    const usesMobileLayout = window.matchMedia('(max-width: 760px), (hover: none) and (pointer: coarse)').matches;
+    if (!title || !characterName || !usesMobileLayout || !modal.classList.contains('stca-preview-mode')) {
+      title?.style.removeProperty('font-size');
+      return;
+    }
+
+    title.style.removeProperty('font-size');
+    let fontSize = Number.parseFloat(getComputedStyle(title).fontSize) || 16;
+    const minimumFontSize = Math.min(fontSize, 12);
+    title.style.fontSize = `${fontSize}px`;
+
+    while (characterName.scrollWidth > characterName.clientWidth && fontSize > minimumFontSize) {
+      fontSize = Math.max(minimumFontSize, fontSize - 0.5);
+      title.style.fontSize = `${fontSize}px`;
+    }
+  }
+
   function activateModal(overlay) {
     if (window.matchMedia('(max-width: 760px)').matches && document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
@@ -611,6 +631,7 @@
       root.style.setProperty('--stca-modal-left', `${Math.round(viewport?.offsetLeft || 0)}px`);
       root.style.setProperty('--stca-modal-width', `${Math.round(viewport?.width || window.innerWidth)}px`);
       root.style.setProperty('--stca-modal-height', `${Math.round(viewport?.height || window.innerHeight)}px`);
+      requestAnimationFrame(() => fitPreviewCharacterTitle(overlay.querySelector('.stca-modal')));
     };
     syncViewport();
     viewport?.addEventListener('resize', syncViewport);
@@ -627,6 +648,7 @@
     document.documentElement.classList.add('stca-modal-open');
     document.body.append(overlay);
     state.modal = overlay;
+    requestAnimationFrame(() => fitPreviewCharacterTitle(overlay.querySelector('.stca-modal')));
   }
 
   function confirmDelete(fileName) {
@@ -752,6 +774,7 @@
   function returnToChatList(modalBody, pane) {
     const modal = modalBody?.closest('.stca-modal');
     modal?.classList.remove('stca-preview-mode');
+    fitPreviewCharacterTitle(modal);
     modalBody?.classList.remove('stca-preview-active');
     modalBody?.classList.add('stca-no-preview');
     modalBody?.querySelectorAll('.stca-chat-row.selected').forEach(row => row.classList.remove('selected'));
@@ -849,6 +872,7 @@
     if (mobileOpen) mobileOpen.dataset.fileName = fileName;
     const mobileFileName = modal?.querySelector('.stca-preview-file-name');
     if (mobileFileName) mobileFileName.textContent = fileName;
+    requestAnimationFrame(() => fitPreviewCharacterTitle(modal));
     pane.replaceChildren(header, createEmpty('正在读取最后两条消息...'));
     pane.scrollTop = 0;
 

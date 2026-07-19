@@ -575,7 +575,6 @@ html.stca-modal-open body {
     justify-content: center;
     min-width: 0;
     padding: 0 2px;
-    font-size: clamp(12px, calc(var(--mainFontSize) * 0.72), 16px);
     text-align: center;
   }
 
