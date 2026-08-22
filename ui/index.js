@@ -2,7 +2,7 @@
   'use strict';
 
   const MODULE_NAME = 'chat_archive';
-  const VERSION = '0.5.11';
+  const VERSION = '0.6.0';
   const API_ROOT = '/api/plugins/chat-archive';
   const PINNED_STORAGE_KEY = 'pinnedChats';
   const RECENT_OPENED_STORAGE_KEY = 'chatArchiveLastOpened';
@@ -15,6 +15,7 @@
     showArchive: true,
     characterSort: 'recent',
     chatSort: 'recent',
+    characterLimit: 0,
     deleteEnabled: true,
     requireDeleteName: false,
   });
@@ -159,6 +160,131 @@
       file_name: item.file_name.endsWith('.jsonl') ? item.file_name : `${item.file_name}.jsonl`,
       opened_at: Date.now(),
     }));
+  }
+
+  function getCharacterLimit() {
+    const value = Number.parseInt(getSettings().characterLimit, 10);
+    return Number.isInteger(value) && value > 0 ? value : 0;
+  }
+
+  function stripJsonl(fileName) {
+    return String(fileName || '').replace(/\.jsonl$/i, '');
+  }
+
+  function withJsonl(fileName) {
+    const value = stripJsonl(fileName);
+    return `${value}.jsonl`;
+  }
+
+  function updateChatReferences(oldItem, newFileName) {
+    const oldKey = getPinnedKey(oldItem);
+    const updatedItem = { ...oldItem, file_name: withJsonl(newFileName) };
+    const newKey = getPinnedKey(updatedItem);
+    const pinnedState = getPinnedState();
+    if (Object.hasOwn(pinnedState, oldKey)) {
+      pinnedState[newKey] = {
+        group: updatedItem.group || '',
+        avatar: updatedItem.avatar || '',
+        file_name: updatedItem.file_name,
+      };
+      delete pinnedState[oldKey];
+      state.context.accountStorage.setItem(PINNED_STORAGE_KEY, JSON.stringify(pinnedState));
+    }
+
+    const recent = getRecentOpened();
+    if (recent && getPinnedKey(recent) === oldKey) {
+      setRecentOpened(updatedItem);
+    }
+  }
+
+  function promptRename(fileName) {
+    return new Promise(resolve => {
+      const oldName = stripJsonl(fileName);
+      const overlay = document.createElement('div');
+      overlay.className = 'stca-confirm-overlay';
+      const dialog = document.createElement('div');
+      dialog.className = 'stca-confirm-dialog stca-rename-dialog';
+      const title = document.createElement('strong');
+      title.textContent = '重命名聊天文件';
+      const text = document.createElement('p');
+      text.textContent = '重命名可能影响此聊天的分支或检查点关联，是否继续？';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'text_pole stca-rename-input';
+      input.value = oldName;
+      input.autocomplete = 'off';
+      const actions = document.createElement('div');
+      actions.className = 'stca-confirm-actions';
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'menu_button';
+      cancel.textContent = '取消';
+      const confirm = document.createElement('button');
+      confirm.type = 'button';
+      confirm.className = 'menu_button';
+      confirm.textContent = '确定';
+
+      const getNewName = () => stripJsonl(input.value.trim());
+      const updateConfirmState = () => {
+        const value = getNewName();
+        confirm.disabled = !value || value === oldName || /[\\/\0]/.test(value) || value === '.' || value === '..';
+      };
+      const finish = value => {
+        overlay.remove();
+        resolve(value);
+      };
+      input.addEventListener('input', updateConfirmState);
+      input.addEventListener('keydown', event => {
+        if (event.key === 'Enter' && !confirm.disabled) finish(getNewName());
+        if (event.key === 'Escape') finish(null);
+      });
+      cancel.addEventListener('click', () => finish(null));
+      confirm.addEventListener('click', () => finish(getNewName()));
+      overlay.addEventListener('click', event => {
+        if (event.target === overlay) finish(null);
+      });
+      actions.append(cancel, confirm);
+      dialog.append(title, text, input, actions);
+      overlay.append(dialog);
+      document.body.append(overlay);
+      updateConfirmState();
+      input.focus();
+      input.select();
+    });
+  }
+
+  async function renameChatFile(item) {
+    const newFileName = await promptRename(item.file_name);
+    if (!newFileName) return null;
+
+    try {
+      const context = state.context ?? getContext();
+      const response = await fetch('/api/chats/rename', {
+        method: 'POST',
+        headers: context.getRequestHeaders(),
+        body: JSON.stringify({
+          is_group: Boolean(item.group),
+          avatar_url: item.avatar || '',
+          original_file: withJsonl(item.file_name),
+          renamed_file: withJsonl(newFileName),
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.error) {
+        throw new Error(data.error ? '酒馆拒绝了这个新名称。' : '重命名请求失败。');
+      }
+
+      const actualName = stripJsonl(data.sanitizedFileName || newFileName);
+      updateChatReferences(item, actualName);
+      state.catalog = null;
+      await refreshHomeSections();
+      toastr.success(`聊天文件已重命名为“${actualName}”。`);
+      return actualName;
+    } catch (error) {
+      console.error(`[${MODULE_NAME}] Failed to rename chat`, error);
+      toastr.error(`重命名失败：${error.message}`);
+      return null;
+    }
   }
 
   function removeChatReferences(item) {
@@ -375,8 +501,9 @@
       if (setPinned(chat, false)) await refreshHomeSections();
     });
     unpinButton.classList.add('active');
+    const renameButton = createIconButton('fa-pencil', '重命名聊天文件', () => renameChatFile(chat));
     const previewButton = createTextButton('预览', '预览最后两条消息', () => showQuickPreview(chat));
-    actions.append(unpinButton, previewButton);
+    actions.append(unpinButton, renameButton, previewButton);
     row.append(image, content, actions);
     row.addEventListener('click', () => void openChat(chat));
     row.addEventListener('keydown', event => {
@@ -515,10 +642,14 @@
       if (characterList) state.catalog = catalogData.characters || [];
       pinnedList?.replaceChildren(...(pinnedChats.length ? pinnedChats.map(createPinnedRow) : [createEmpty('还没有置顶聊天')]));
       recentList?.replaceChildren(...(recentChat ? [createRecentRow(recentChat)] : [createEmpty('还没有最近聊天')]));
-      characterList?.replaceChildren(...(state.catalog.length ? sortCharacters(state.catalog).map(createCharacterRow) : [createEmpty('没有找到角色聊天文件')]));
+      const catalog = characterList ? (state.catalog || []) : [];
+      const sortedCharacters = sortCharacters(catalog);
+      const characterLimit = getCharacterLimit();
+      const visibleCharacters = characterLimit ? sortedCharacters.slice(0, characterLimit) : sortedCharacters;
+      characterList?.replaceChildren(...(visibleCharacters.length ? visibleCharacters.map(createCharacterRow) : [createEmpty('没有找到角色聊天文件')]));
     } catch (error) {
       console.error(`[${MODULE_NAME}] Failed to load archive home`, error);
-      characterList.replaceChildren(createEmpty(`读取失败：${error.message}`));
+      characterList?.replaceChildren(createEmpty(`读取失败：${error.message}`));
     }
   }
 
@@ -814,6 +945,14 @@
     });
     pinButton.classList.toggle('active', isPinned(pinItem));
     const previewButton = createIconButton('fa-eye', '预览最后两条消息', () => showPreview(avatar, chat.file_name, previewPane, row));
+    const renameButton = createIconButton('fa-pencil', '重命名聊天文件', async () => {
+      const renamed = await renameChatFile(pinItem);
+      if (!renamed) return;
+      chat.file_name = renamed;
+      row.dataset.search = renamed.toLowerCase();
+      title.textContent = renamed;
+      pinItem.file_name = withJsonl(renamed);
+    });
     const openButton = createIconButton('fa-arrow-right', '打开聊天', () => openChat({ avatar, file_name: chat.file_name }));
     const deleteButton = createIconButton('fa-trash', '删除聊天文件', async () => {
       if (!await confirmDelete(chat.file_name)) return;
@@ -841,7 +980,7 @@
       }
     });
     deleteButton.classList.add('stca-delete-button');
-    actions.append(pinButton, previewButton, openButton);
+    actions.append(pinButton, previewButton, renameButton, openButton);
     if (getSettings().deleteEnabled) actions.append(deleteButton);
     row.append(content, actions);
     return row;
@@ -1020,6 +1159,29 @@
     addCheckbox('显示最近聊天', settings.showRecent, value => updateSettings({ showRecent: value }));
     addCheckbox('显示角色归档', settings.showArchive, value => updateSettings({ showArchive: value }));
     divider();
+    const limitRow = document.createElement('label');
+    limitRow.className = 'stca-setting-row';
+    const limitText = document.createElement('span');
+    limitText.textContent = '角色归档最多显示';
+    const limitInput = document.createElement('input');
+    limitInput.type = 'number';
+    limitInput.className = 'text_pole stca-number-input';
+    limitInput.min = '1';
+    limitInput.step = '1';
+    limitInput.inputMode = 'numeric';
+    limitInput.placeholder = '无限制';
+    const characterLimit = getCharacterLimit();
+    limitInput.value = characterLimit ? String(characterLimit) : '';
+    limitInput.title = '留空表示显示全部角色';
+    limitInput.addEventListener('change', () => {
+      const raw = limitInput.value.trim();
+      const parsed = Number.parseInt(raw, 10);
+      const value = Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+      limitInput.value = value ? String(value) : '';
+      updateSettings({ characterLimit: value });
+    });
+    limitRow.append(limitText, limitInput);
+    content.append(limitRow);
     addSelect('角色排序', settings.characterSort, [
       ['recent', '最近聊天'],
       ['name', '角色名称'],

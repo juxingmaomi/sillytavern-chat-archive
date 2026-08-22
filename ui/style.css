@@ -371,6 +371,12 @@ html.stca-modal-open body {
   width: min(180px, 48%);
 }
 
+.stca-setting-row .stca-number-input {
+  width: min(150px, 48%);
+  min-width: 0;
+  box-sizing: border-box;
+}
+
 .stca-text-button {
   min-width: 52px;
   padding: 5px 9px;
@@ -433,6 +439,12 @@ html.stca-modal-open body {
 .stca-delete-confirm-input {
   width: 100%;
   margin-bottom: 10px;
+}
+
+.stca-rename-input {
+  width: 100%;
+  margin-bottom: 10px;
+  box-sizing: border-box;
 }
 
 .stca-message-row {
