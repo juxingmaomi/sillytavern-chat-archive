@@ -760,3 +760,24 @@ html.stca-modal-open body {
     gap: 2px;
   }
 }
+
+.stca-expand-toggle .stca-expand-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 10px;
+  border: 1px dashed var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.5));
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.8;
+  cursor: pointer;
+}
+
+.stca-expand-toggle .stca-expand-button:hover {
+  opacity: 1;
+  background: var(--SmartThemeBlurTintColor, rgba(127, 127, 127, 0.12));
+}

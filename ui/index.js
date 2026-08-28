@@ -2,7 +2,7 @@
   'use strict';
 
   const MODULE_NAME = 'chat_archive';
-  const VERSION = '0.6.0';
+  const VERSION = '0.7.0';
   const API_ROOT = '/api/plugins/chat-archive';
   const PINNED_STORAGE_KEY = 'pinnedChats';
   const RECENT_OPENED_STORAGE_KEY = 'chatArchiveLastOpened';
@@ -16,6 +16,8 @@
     characterSort: 'recent',
     chatSort: 'recent',
     characterLimit: 0,
+    pinnedLimit: 0,
+    showExpandToggle: true,
     deleteEnabled: true,
     requireDeleteName: false,
   });
@@ -28,6 +30,8 @@
     modalViewportCleanup: null,
     selectedAvatar: '',
     openingChat: false,
+    expandedPinned: false,
+    expandedCharacters: false,
   };
 
   function getContext() {
@@ -162,9 +166,17 @@
     }));
   }
 
-  function getCharacterLimit() {
-    const value = Number.parseInt(getSettings().characterLimit, 10);
+  function getLimit(key) {
+    const value = Number.parseInt(getSettings()[key], 10);
     return Number.isInteger(value) && value > 0 ? value : 0;
+  }
+
+  function getCharacterLimit() {
+    return getLimit('characterLimit');
+  }
+
+  function getPinnedLimit() {
+    return getLimit('pinnedLimit');
   }
 
   function stripJsonl(fileName) {
@@ -624,6 +636,32 @@
     });
   }
 
+  function renderLimitedList({ list, items, expandedKey, createRow, limit, emptyText, panel }) {
+    if (!list) return;
+    const settings = getSettings();
+    const expanded = Boolean(state[expandedKey]);
+    const visible = limit && !expanded ? items.slice(0, limit) : items;
+    list.replaceChildren(...(items.length ? visible.map(createRow) : [createEmpty(emptyText)]));
+    const toggle = panel?.querySelector(`[data-stca-expand="${expandedKey}"]`);
+    if (!toggle) return;
+    const hiddenCount = limit ? items.length - limit : 0;
+    if (!settings.showExpandToggle || hiddenCount <= 0) {
+      toggle.replaceChildren();
+      return;
+    }
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'stca-expand-button';
+    button.innerHTML = expanded
+      ? '<i class="fa-solid fa-chevron-up"></i> 收起'
+      : `<i class="fa-solid fa-chevron-down"></i> 展开剩余 ${hiddenCount} 项`;
+    button.addEventListener('click', () => {
+      state[expandedKey] = !expanded;
+      void refreshHomeSections(panel);
+    });
+    toggle.replaceChildren(button);
+  }
+
   async function refreshHomeSections(panel = document.querySelector('.welcomePanel.stca-enhanced')) {
     if (!panel) return;
     const pinnedList = panel.querySelector('.stca-pinned-list');
@@ -640,13 +678,11 @@
         characterList ? (state.catalog ? Promise.resolve({ characters: state.catalog }) : requestApi('catalog', {})) : Promise.resolve({ characters: [] }),
       ]);
       if (characterList) state.catalog = catalogData.characters || [];
-      pinnedList?.replaceChildren(...(pinnedChats.length ? pinnedChats.map(createPinnedRow) : [createEmpty('还没有置顶聊天')]));
+      renderLimitedList({ list: pinnedList, items: pinnedChats, expandedKey: 'expandedPinned', createRow: createPinnedRow, limit: getPinnedLimit(), emptyText: '还没有置顶聊天', panel });
       recentList?.replaceChildren(...(recentChat ? [createRecentRow(recentChat)] : [createEmpty('还没有最近聊天')]));
       const catalog = characterList ? (state.catalog || []) : [];
       const sortedCharacters = sortCharacters(catalog);
-      const characterLimit = getCharacterLimit();
-      const visibleCharacters = characterLimit ? sortedCharacters.slice(0, characterLimit) : sortedCharacters;
-      characterList?.replaceChildren(...(visibleCharacters.length ? visibleCharacters.map(createCharacterRow) : [createEmpty('没有找到角色聊天文件')]));
+      renderLimitedList({ list: characterList, items: sortedCharacters, expandedKey: 'expandedCharacters', createRow: createCharacterRow, limit: getCharacterLimit(), emptyText: '没有找到角色聊天文件', panel });
     } catch (error) {
       console.error(`[${MODULE_NAME}] Failed to load archive home`, error);
       characterList?.replaceChildren(createEmpty(`读取失败：${error.message}`));
@@ -665,7 +701,10 @@
     pinnedTitle.innerHTML = '<span><i class="fa-solid fa-thumbtack"></i> 置顶聊天</span>';
     const pinnedList = document.createElement('div');
     pinnedList.className = 'stca-pinned-list';
-    pinnedSection.append(pinnedTitle, pinnedList);
+    const pinnedToggle = document.createElement('div');
+    pinnedToggle.className = 'stca-expand-toggle';
+    pinnedToggle.dataset.stcaExpand = 'expandedPinned';
+    pinnedSection.append(pinnedTitle, pinnedList, pinnedToggle);
 
     const archiveSection = document.createElement('section');
     archiveSection.className = 'stca-section';
@@ -680,7 +719,10 @@
     archiveTitle.append(titleText, refreshButton);
     const characterList = document.createElement('div');
     characterList.className = 'stca-character-list';
-    archiveSection.append(archiveTitle, characterList);
+    const characterToggle = document.createElement('div');
+    characterToggle.className = 'stca-expand-toggle';
+    characterToggle.dataset.stcaExpand = 'expandedCharacters';
+    archiveSection.append(archiveTitle, characterList, characterToggle);
     const recentSection = document.createElement('section');
     recentSection.className = 'stca-section';
     const recentTitle = document.createElement('div');
@@ -1159,29 +1201,34 @@
     addCheckbox('显示最近聊天', settings.showRecent, value => updateSettings({ showRecent: value }));
     addCheckbox('显示角色归档', settings.showArchive, value => updateSettings({ showArchive: value }));
     divider();
-    const limitRow = document.createElement('label');
-    limitRow.className = 'stca-setting-row';
-    const limitText = document.createElement('span');
-    limitText.textContent = '角色归档最多显示';
-    const limitInput = document.createElement('input');
-    limitInput.type = 'number';
-    limitInput.className = 'text_pole stca-number-input';
-    limitInput.min = '1';
-    limitInput.step = '1';
-    limitInput.inputMode = 'numeric';
-    limitInput.placeholder = '无限制';
-    const characterLimit = getCharacterLimit();
-    limitInput.value = characterLimit ? String(characterLimit) : '';
-    limitInput.title = '留空表示显示全部角色';
-    limitInput.addEventListener('change', () => {
-      const raw = limitInput.value.trim();
-      const parsed = Number.parseInt(raw, 10);
-      const value = Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
-      limitInput.value = value ? String(value) : '';
-      updateSettings({ characterLimit: value });
-    });
-    limitRow.append(limitText, limitInput);
-    content.append(limitRow);
+    const addLimitRow = (label, key, title) => {
+      const row = document.createElement('label');
+      row.className = 'stca-setting-row';
+      const text = document.createElement('span');
+      text.textContent = label;
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.className = 'text_pole stca-number-input';
+      input.min = '1';
+      input.step = '1';
+      input.inputMode = 'numeric';
+      input.placeholder = '无限制';
+      const value = getLimit(key);
+      input.value = value ? String(value) : '';
+      input.title = title;
+      input.addEventListener('change', () => {
+        const raw = input.value.trim();
+        const parsed = Number.parseInt(raw, 10);
+        const next = Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+        input.value = next ? String(next) : '';
+        updateSettings({ [key]: next });
+      });
+      row.append(text, input);
+      content.append(row);
+    };
+    addLimitRow('置顶聊天最多显示', 'pinnedLimit', '留空表示显示全部置顶聊天');
+    addLimitRow('角色归档最多显示', 'characterLimit', '留空表示显示全部角色');
+    addCheckbox('超出上限时显示展开按钮', settings.showExpandToggle, value => updateSettings({ showExpandToggle: value }));
     addSelect('角色排序', settings.characterSort, [
       ['recent', '最近聊天'],
       ['name', '角色名称'],
