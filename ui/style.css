@@ -57,7 +57,7 @@ html.stca-modal-open body {
   border: 1px solid var(--SmartThemeBorderColor);
   border-radius: 8px;
   background: transparent;
-  color: var(--SmartThemeBodyColor);
+  color: inherit;
   text-align: left;
   box-sizing: border-box;
 }
@@ -81,7 +81,7 @@ html.stca-modal-open body {
 .stca-character-row:hover,
 .stca-chat-row:hover,
 .stca-chat-row.selected {
-  background: var(--white30a);
+  background: color-mix(in srgb, currentColor 10%, transparent);
 }
 
 .stca-avatar {
@@ -142,7 +142,18 @@ html.stca-modal-open body {
   padding: 0;
 }
 
-.stca-icon-button.active {
+/* Custom welcome themes may change color without updating SmartThemeBodyColor. */
+.stca-home .menu_button {
+  color: inherit;
+  background: transparent;
+}
+
+.stca-home .menu_button:hover {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.stca-icon-button.active,
+.stca-home .stca-icon-button.active {
   color: var(--SmartThemeQuoteColor);
 }
 
@@ -779,5 +790,5 @@ html.stca-modal-open body {
 
 .stca-expand-toggle .stca-expand-button:hover {
   opacity: 1;
-  background: var(--SmartThemeBlurTintColor, rgba(127, 127, 127, 0.12));
+  background: color-mix(in srgb, currentColor 10%, transparent);
 }
